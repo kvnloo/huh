@@ -460,11 +460,19 @@ func (f *Form) KeyBinds() []key.Binding {
 
 // Get returns a result from the form.
 func (f *Form) Get(key string) any {
+	if value := f.getLiveFieldValue(key); value != nil {
+		return value
+	}
 	return f.results[key]
 }
 
 // GetString returns a result as a string from the form.
 func (f *Form) GetString(key string) string {
+	if value := f.getLiveFieldValue(key); value != nil {
+		if v, ok := value.(string); ok {
+			return v
+		}
+	}
 	v, ok := f.results[key].(string)
 	if !ok {
 		return ""
@@ -472,8 +480,39 @@ func (f *Form) GetString(key string) string {
 	return v
 }
 
+// getLiveFieldValue returns the live value of a field if it exists and matches the key.
+// It searches through all groups to find the field with the given key.
+func (f *Form) getLiveFieldValue(key string) any {
+	if f.selector.Empty() {
+		return nil
+	}
+	var foundValue any
+	f.selector.Range(func(_ int, group *Group) bool {
+		if group.selector.Empty() {
+			return true
+		}
+		group.selector.Range(func(_ int, field Field) bool {
+			if field.GetKey() == key {
+				foundValue = field.GetValue()
+				return false
+			}
+			return true
+		})
+		if foundValue != nil {
+			return false
+		}
+		return true
+	})
+	return foundValue
+}
+
 // GetInt returns a result as a int from the form.
 func (f *Form) GetInt(key string) int {
+	if value := f.getLiveFieldValue(key); value != nil {
+		if v, ok := value.(int); ok {
+			return v
+		}
+	}
 	v, ok := f.results[key].(int)
 	if !ok {
 		return 0
@@ -483,6 +522,11 @@ func (f *Form) GetInt(key string) int {
 
 // GetBool returns a result as a string from the form.
 func (f *Form) GetBool(key string) bool {
+	if value := f.getLiveFieldValue(key); value != nil {
+		if v, ok := value.(bool); ok {
+			return v
+		}
+	}
 	v, ok := f.results[key].(bool)
 	if !ok {
 		return false
