@@ -1717,3 +1717,92 @@ func requireContains(tb testing.TB, s, subtr string) {
 }
 
 func viewModel(m Model) string { return ansi.Strip(m.View()) }
+
+func TestGetStringMidEdit(t *testing.T) {
+	// Test that GetString returns the live field value while editing,
+	// not just after advancing to the next field
+	field1 := NewInput().Key("name1").Title("First name")
+	field2 := NewInput().Key("name2").Title("Second name")
+	
+	f := NewForm(NewGroup(field1, field2))
+	f.Update(f.Init())
+	
+	// Initially, both should be empty
+	if got := f.GetString("name1"); got != "" {
+		t.Errorf("Expected name1 to be empty initially, got %q", got)
+	}
+	if got := f.GetString("name2"); got != "" {
+		t.Errorf("Expected name2 to be empty initially, got %q", got)
+	}
+	
+	// Type in the first field
+	f = typeText(f, "Alice")
+	
+	// GetString should return the value even though we haven't advanced
+	if got := f.GetString("name1"); got != "Alice" {
+		t.Errorf("Expected name1 to be %q while editing, got %q", "Alice", got)
+	}
+	
+	// Advance to the second field
+	f = batchUpdate(f.Update(codeKeypress(tea.KeyEnter))).(*Form)
+	
+	// First field value should still be accessible
+	if got := f.GetString("name1"); got != "Alice" {
+		t.Errorf("Expected name1 to be %q after advancing, got %q", "Alice", got)
+	}
+	
+	// Type in the second field
+	f = typeText(f, "Bob")
+	
+	// Both values should be accessible while editing the second field
+	if got := f.GetString("name1"); got != "Alice" {
+		t.Errorf("Expected name1 to be %q, got %q", "Alice", got)
+	}
+	if got := f.GetString("name2"); got != "Bob" {
+		t.Errorf("Expected name2 to be %q while editing, got %q", "Bob", got)
+	}
+}
+
+func TestGetIntMidEdit(t *testing.T) {
+	field := NewSelect[int]().
+		Key("age").
+		Options(NewOptions(18, 21, 25)...).
+		Title("Age")
+	
+	f := NewForm(NewGroup(field))
+	f.Update(f.Init())
+	
+	// Initially should be the first option (18)
+	if got := f.GetInt("age"); got != 18 {
+		t.Errorf("Expected age to be 18, got %d", got)
+	}
+	
+	// Move down to select 21
+	f = batchUpdate(f.Update(codeKeypress(tea.KeyDown))).(*Form)
+	
+	// GetInt should return the live selection
+	if got := f.GetInt("age"); got != 21 {
+		t.Errorf("Expected age to be 21 while editing, got %d", got)
+	}
+}
+
+func TestGetBoolMidEdit(t *testing.T) {
+	field := NewConfirm().Key("confirmed").Title("Confirm?")
+	
+	f := NewForm(NewGroup(field))
+	f.Update(f.Init())
+	
+	// Initially false
+	if got := f.GetBool("confirmed"); got != false {
+		t.Errorf("Expected confirmed to be false, got %v", got)
+	}
+	
+	// Toggle to true
+	f = batchUpdate(f.Update(codeKeypress(tea.KeyLeft))).(*Form)
+	
+	// GetBool should return the live value
+	if got := f.GetBool("confirmed"); got != true {
+		t.Errorf("Expected confirmed to be true while editing, got %v", got)
+	}
+}
+
